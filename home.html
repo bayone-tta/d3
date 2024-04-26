@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D3.test</title>
+    <script src="d3.v7.js"></script>
+    <style>
+        .cursor-label {
+        position: absolute;
+        bottom: 10px; /* Adjust as needed */
+        right: 10px; /* Adjust as needed */
+        pointer-events: none;
+        font-size: 12px;
+        background-color: rgba(255, 255, 255, 0);
+        border: 1px solid #ccc;
+        padding: 5px;
+        opacity: 0;
+    }
+    </style>
+</head>
+<body>
+    <div id="chart"></div>
+    <div id="second-chart"></div>
+    <ul id="selected-list"></ul>
+
+    <script>
+        d3.csv("MOCK_DATA.csv").then(data => {
+            const width = 600;
+            const height = 400;
+            const width2 = 300;
+            const height2 = 200;
+            const marginTop = 20;
+            const marginRight = 30;
+            const marginBottom = 30;
+            const marginLeft = 40;
+
+            const x = d3.scaleLinear()
+                .domain([0, d3.max(data, d => +d.posX)]).nice()
+                .range([marginLeft, width - marginRight])
+                .unknown(marginLeft);
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(data, d => +d.posY)]).nice()
+                .range([height - marginBottom, marginTop])
+                .unknown(height - marginBottom);
+
+            const svg = d3.select("#chart").append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            svg.append("g")
+                .attr("transform", `translate(0,${height - marginBottom})`)
+                .call(d3.axisBottom(x))
+                .call(g => g.select(".domain").remove())
+                .call(g => g.append("text")
+                    .attr("x", width - marginRight)
+                    .attr("y", -4)
+                    .attr("fill", "#000")
+                    .attr("font-weight", "bold")
+                    .attr("text-anchor", "end")
+                    .text("posX"));
+
+            svg.append("g")
+                .attr("transform", `translate(${marginLeft},0)`)
+                .call(d3.axisLeft(y))
+                .call(g => g.select(".domain").remove())
+                .call(g => g.select(".tick:last-of-type text").clone()
+                    .attr("x", 4)
+                    .attr("text-anchor", "start")
+                    .attr("font-weight", "bold")
+                    .text("posY"));
+
+            const dot = svg.append("g")
+                .attr("fill", "none")
+                .attr("stroke", "steelblue")
+                .attr("stroke-width", 1.5)
+                .selectAll("circle")
+                .data(data)
+                .join("circle")
+                .attr("transform", d => `translate(${x(+d.posX)},${y(+d.posY)})`)
+                .attr("r", 3);
+
+            const secondSvg = d3.select("#second-chart").append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const cursorLabel = d3.select("body").append("div")
+                .attr("class", "cursor-label")
+                .style("opacity", 0);
+
+            svg.call(d3.brush().on("start brush end", ({selection}) => {
+                let value = [];
+                if (selection) {
+                    const [[x0, y0], [x1, y1]] = selection;
+                    value = dot
+                        .style("stroke", "gray")
+                        .filter(d => x0 <= x(+d.posX) && x(+d.posX) < x1
+                                && y0 <= y(+d.posY) && y(+d.posY) < y1)
+                        .style("stroke", "steelblue")
+                        .data();
+
+                    updateSecondChart(value);
+                } else {
+                    dot.style("stroke", "steelblue");
+                }
+
+                // You can use 'value' to get the selected data points
+                console.log(value);
+            }));
+
+            
+
+            function updateSecondChart(selectedData) {
+                // Clear existing content
+                secondSvg.selectAll("*").remove();
+
+                // Add selected points to the second chart
+                secondSvg.selectAll("circle")
+                    .data(selectedData)
+                    .enter().append("circle")
+                    .attr("cx", d => x(+d.posX))
+                    .attr("cy", d => y(+d.value))
+                    .attr("r", 3)
+                    .attr("fill", "red")
+                    .on("mousemove", function(d) {
+                    const [xPos, yPos] = d3.pointer(this);
+                    console.log();
+                    cursorLabel.style("left", (xPos + 10) + "px")
+                        .style("top", (yPos - 20) + "px")
+                        .style("opacity", 1)
+                        .html(`name: ${d.target.__data__.blast_name}<br/>date: ${d.target.__data__.date}<br/>value: ${d.target.__data__.value}<br/>posX: ${d.target.__data__.posX}<br/>posY: ${d.target.__data__.posY}<br/>blast_code: ${d.target.__data__.blast_code}`);
+                    });
+
+                updateSelectedList(selectedData);
+
+            }
+            function updateSelectedList(selectedData) {
+                const selectedList = d3.select("#selected-list");
+
+                // Clear existing content
+                selectedList.selectAll("li").remove();
+
+                // Add new list items for selected data points
+                selectedList.selectAll("li")
+                    .data(selectedData)
+                    .enter().append("li")
+                    .html(d => `name: ${d.blast_name}, date: ${d.date}, value: ${d.value}, posX: ${d.posX}, posY: ${d.posY}, blast_code: ${d.blast_code}`);
+            }
+        });
+    </script>
+</body>
+</html>
